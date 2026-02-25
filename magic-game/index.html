@@ -1,0 +1,433 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>奇数阶幻方闯关挑战</title>
+    <style>
+        :root {
+            --bg-color: #f0f2f5;
+            --primary-color: #4a90e2;
+            --success-color: #52c41a;
+            --error-color: #ff4d4f;
+            --text-color: #333;
+            --cell-bg: #fff;
+            --cell-filled: #e6f7ff;
+            --border-color: #d9d9d9;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-height: 100vh;
+        }
+
+        h1 {
+            margin-bottom: 20px;
+            font-size: 1.8rem;
+            color: var(--text-color);
+        }
+
+        /* 控制面板 */
+        .controls {
+            background: #fff;
+            padding: 15px 25px;
+            border-radius: 8px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            display: flex;
+            gap: 15px;
+            align-items: center;
+            flex-wrap: wrap;
+            justify-content: center;
+            margin-bottom: 20px;
+        }
+
+        input[type="number"] {
+            padding: 8px;
+            border: 1px solid var(--border-color);
+            border-radius: 4px;
+            width: 60px;
+            text-align: center;
+            font-size: 1rem;
+        }
+
+        button {
+            padding: 8px 20px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 1rem;
+            transition: all 0.2s;
+            font-weight: 500;
+        }
+
+        #startBtn {
+            background-color: var(--primary-color);
+            color: white;
+        }
+        #startBtn:hover { background-color: #40a9ff; }
+
+        #resetBtn {
+            background-color: #f5f5f5;
+            color: #666;
+            border: 1px solid #d9d9d9;
+        }
+        #resetBtn:hover:not(:disabled) { background-color: #e6e6e6; }
+        #resetBtn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+        /* 状态提示 */
+        #message {
+            height: 40px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.2rem;
+            margin-bottom: 10px;
+            font-weight: bold;
+        }
+        .msg-success { color: var(--success-color); }
+        .msg-error { color: var(--error-color); }
+
+        /* 游戏网格区域 */
+        #game-container {
+            width: 100%;
+            max-width: 600px; /* 限制最大宽度 */
+            aspect-ratio: 1;  /* 保持正方形 */
+            position: relative;
+        }
+
+        #grid {
+            display: grid;
+            gap: 2px;
+            background-color: #ccc;
+            border: 2px solid #999;
+            width: 100%;
+            height: 100%;
+        }
+
+        .cell {
+            background-color: var(--cell-bg);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.2rem;
+            cursor: pointer;
+            user-select: none;
+            transition: background-color 0.2s;
+            font-weight: bold;
+        }
+
+        /* 动态字体大小，避免N很大时数字挤在一起 */
+        .cell.small-text { font-size: 0.8rem; }
+        .cell.tiny-text { font-size: 0.6rem; }
+
+        .cell:hover { background-color: #f0f0f0; }
+        
+        .cell.filled {
+            background-color: var(--cell-filled);
+            color: var(--primary-color);
+            cursor: default;
+        }
+
+        /* 动画特效 */
+        .shake {
+            animation: shake 0.4s cubic-bezier(.36,.07,.19,.97) both;
+        }
+
+        @keyframes shake {
+            10%, 90% { transform: translate3d(-1px, 0, 0); }
+            20%, 80% { transform: translate3d(2px, 0, 0); }
+            30%, 50%, 70% { transform: translate3d(-4px, 0, 0); }
+            40%, 60% { transform: translate3d(4px, 0, 0); }
+        }
+
+        .pop-in {
+            animation: popIn 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        }
+
+        @keyframes popIn {
+            from { transform: scale(0.5); opacity: 0; }
+            to { transform: scale(1); opacity: 1; }
+        }
+
+        /* 规则折叠面板 */
+        details {
+            margin-top: 30px;
+            color: #666;
+            max-width: 600px;
+            line-height: 1.6;
+            background: #fff;
+            padding: 10px 20px;
+            border-radius: 8px;
+        }
+        summary { cursor: pointer; font-weight: bold; margin-bottom: 10px; }
+
+        /* 胜利弹窗 */
+        #overlay {
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(0,0,0,0.5);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            opacity: 0;
+            visibility: hidden;
+            transition: all 0.3s;
+            z-index: 1000;
+        }
+        #overlay.show { opacity: 1; visibility: visible; }
+        
+        .modal {
+            background: white;
+            padding: 40px;
+            border-radius: 12px;
+            text-align: center;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+            transform: translateY(20px);
+            transition: transform 0.3s;
+        }
+        #overlay.show .modal { transform: translateY(0); }
+        
+        .modal h2 { margin: 0 0 10px 0; color: var(--success-color); }
+        .modal p { font-size: 1.2rem; }
+        
+        /* 彩纸特效 */
+        .confetti {
+            position: absolute;
+            width: 10px; height: 10px;
+            background-color: #f00;
+            animation: fall linear forwards;
+        }
+        @keyframes fall {
+            to { transform: translateY(100vh) rotate(720deg); }
+        }
+    </style>
+</head>
+<body>
+
+    <h1>✨ 幻方闯关游戏</h1>
+
+    <div class="controls">
+        <label>阶数 (N): <input type="number" id="orderInput" value="3" min="1" max="21" step="2"></label>
+        <button id="startBtn">开始游戏</button>
+        <button id="resetBtn" disabled>重置</button>
+    </div>
+
+    <div id="message">请点击开始游戏</div>
+
+    <div id="game-container">
+        <div id="grid"></div>
+    </div>
+
+    <details>
+        <summary>💡 查看“罗伯法”规则</summary>
+        <p>这是一个经典的<b>奇数阶幻方</b>构造算法（Siamese method）：</p>
+        <ol>
+            <li>数字 <b>1</b> 永远放在<b>第一行的正中间</b>。</li>
+            <li>随后的数字依次放在前一个数字的<b>右上方</b>（行-1，列+1）。</li>
+            <li><b>边界处理：</b>如果超出了上边界，就去最后一行；如果超出了右边界，就去第一列。</li>
+            <li><b>冲突处理：</b>如果右上方已经有数字了，或者正好在右上角（无法再往右上移动），就把数字放在<b>前一个数字的正下方</b>。</li>
+        </ol>
+    </details>
+
+    <div id="overlay">
+        <div class="modal">
+            <h2 id="winTitle">🎉 挑战成功！</h2>
+            <p id="winText">你完美解出了幻方！</p>
+            <button onclick="document.getElementById('overlay').classList.remove('show')" style="margin-top:20px;">关闭</button>
+        </div>
+    </div>
+
+<script>
+    const gridEl = document.getElementById('grid');
+    const msgEl = document.getElementById('message');
+    const startBtn = document.getElementById('startBtn');
+    const resetBtn = document.getElementById('resetBtn');
+    const orderInput = document.getElementById('orderInput');
+    const overlay = document.getElementById('overlay');
+
+    let N = 3;
+    let currentNum = 1;
+    let gridData = []; // 存储正确的幻方数据，用于逻辑判断
+    let userState = { r: 0, c: 0 }; // 记录上一步正确的位置
+    let isPlaying = false;
+
+    // 初始化事件
+    startBtn.addEventListener('click', startGame);
+    resetBtn.addEventListener('click', startGame);
+
+    function startGame() {
+        const val = parseInt(orderInput.value);
+        if (isNaN(val) || val < 1 || val % 2 === 0) {
+            alert("请输入一个奇数（如 3, 5, 7...）");
+            return;
+        }
+        
+        N = val;
+        currentNum = 1;
+        isPlaying = true;
+        resetBtn.disabled = false;
+        overlay.classList.remove('show');
+        msgEl.className = '';
+        msgEl.innerHTML = `请找出数字 <b>1</b> 的位置 (提示: 第一行正中)`;
+
+        // 1. 初始化空网格 UI
+        gridEl.innerHTML = '';
+        gridEl.style.gridTemplateColumns = `repeat(${N}, 1fr)`;
+        gridEl.style.gridTemplateRows = `repeat(${N}, 1fr)`;
+        
+        // 2. 预计算正确的幻方路径（模拟罗伯法）
+        // 我们不预先填入UI，而是用一个二维数组 gridData 记录状态
+        // 0 表示空，非0表示该位置已被占用
+        gridData = Array.from({ length: N }, () => Array(N).fill(0));
+        
+        // 计算初始位置 (逻辑上的)
+        // 罗伯法：1 在第一行中间
+        userState = { r: 0, c: Math.floor(N / 2) };
+        
+        // 生成所有格子 UI
+        for (let r = 0; r < N; r++) {
+            for (let c = 0; c < N; c++) {
+                const cell = document.createElement('div');
+                cell.className = 'cell';
+                cell.dataset.r = r;
+                cell.dataset.c = c;
+                
+                // 根据N的大小调整字体，防止数字太挤
+                if (N >= 7 && N < 15) cell.classList.add('small-text');
+                if (N >= 15) cell.classList.add('tiny-text');
+
+                cell.addEventListener('click', onCellClick);
+                gridEl.appendChild(cell);
+            }
+        }
+    }
+
+    function onCellClick(e) {
+        if (!isPlaying) return;
+
+        const cell = e.target;
+        const r = parseInt(cell.dataset.r);
+        const c = parseInt(cell.dataset.c);
+
+        // 检查点击是否已经在已填充的格子上
+        if (gridData[r][c] !== 0) return;
+
+        // 检查逻辑：是否符合当前步骤
+        // 第一步特殊判断
+        if (currentNum === 1) {
+            if (r === 0 && c === Math.floor(N / 2)) {
+                successMove(cell, r, c);
+            } else {
+                failMove(cell);
+            }
+        } else {
+            // 计算理论上的下一个位置
+            // 规则：上一步位置 (oldR, oldC) -> 右上 (oldR-1, oldC+1)
+            // 需要获取上一步的位置。我们在 successMove 中更新了 userState
+            // 但这里需要根据 userState 推导下一步。
+            // 注意：userState 记录的是 *刚刚填入* 的位置
+            
+            // 重新模拟计算：基于 currentNum-1 的位置推导 currentNum 的位置
+            // 其实不用这么麻烦，我们在 successMove 里直接算好 "Next Target" 存起来可能更好。
+            // 但为了保持逻辑纯粹，我们现场算：
+            
+            // 逻辑回顾：
+            // 如果 userState 是 (r, c)，下一个位置试图是 (r-1, c+1)
+            // 但如果那个位置已被占，则应是 (r+1, c)
+            
+            let nextR = (userState.r - 1 + N) % N;
+            let nextC = (userState.c + 1) % N;
+            
+            if (gridData[nextR][nextC] !== 0) {
+                // 冲突了，改为正下方
+                nextR = (userState.r + 1) % N;
+                nextC = userState.c;
+            }
+            
+            if (r === nextR && c === nextC) {
+                successMove(cell, r, c);
+            } else {
+                failMove(cell);
+            }
+        }
+    }
+
+    function successMove(cell, r, c) {
+        // 更新数据
+        gridData[r][c] = currentNum;
+        userState = { r, c };
+        
+        // 更新 UI
+        cell.textContent = currentNum;
+        cell.classList.add('filled', 'pop-in');
+        
+        currentNum++;
+
+        // 检查胜利
+        if (currentNum > N * N) {
+            gameWin();
+        } else {
+            msgEl.className = 'msg-success';
+            msgEl.innerHTML = `正确！接下来请点击 <b>${currentNum}</b> 的位置`;
+        }
+    }
+
+    function failMove(cell) {
+        // 错误震动特效
+        cell.classList.add('shake');
+        cell.style.backgroundColor = '#fff1f0'; // 浅红背景
+        
+        msgEl.className = 'msg-error';
+        msgEl.textContent = "❌ 位置错误！仔细想想“右上”法则。";
+
+        // 动画结束后移除类，以便下次还能震动
+        setTimeout(() => {
+            cell.classList.remove('shake');
+            cell.style.backgroundColor = ''; 
+        }, 500);
+    }
+
+    function gameWin() {
+        isPlaying = false;
+        msgEl.textContent = "🎉 通关！";
+        
+        // 彩蛋逻辑
+        const winText = document.getElementById('winText');
+        if (N === 21) {
+            winText.textContent = "太强了！无敌啊！你做出了游戏插件！";
+        } else {
+            winText.textContent = `恭喜你完成了 ${N} 阶幻方挑战！`;
+        }
+
+        overlay.classList.add('show');
+        fireConfetti();
+    }
+
+    // 简单的彩纸特效
+    function fireConfetti() {
+        const colors = ['#f00', '#0f0', '#00f', '#ff0', '#0ff', '#f0f'];
+        for (let i = 0; i < 100; i++) {
+            const conf = document.createElement('div');
+            conf.className = 'confetti';
+            conf.style.left = Math.random() * 100 + 'vw';
+            conf.style.backgroundColor = colors[Math.floor(Math.random() * colors.length)];
+            conf.style.animationDuration = (Math.random() * 2 + 2) + 's';
+            conf.style.top = -10 + 'px';
+            document.body.appendChild(conf);
+            
+            // 动画结束后清理 DOM
+            setTimeout(() => {
+                conf.remove();
+            }, 4000);
+        }
+    }
+</script>
+</body>
+</html>
